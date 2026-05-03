@@ -1,0 +1,150 @@
+# Tpms-Forge-<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TPMS Forge — 3D Print Your Metamaterial</title>
+    <style>
+        :root {
+            --bg: #0d0d16; --surface: #1a1a2e; --border: #2d2d44;
+            --text: #d0d0e0; --accent: #e07b5a; --accent2: #5ab0e0;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 16px;
+        }
+        .container {
+            max-width: 680px; width: 100%; background: var(--surface);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 28px; display: flex; flex-direction: column; gap: 20px;
+        }
+        h1 { text-align: center; font-size: 1.5rem; color: #fff; letter-spacing: 0.03em; }
+        .subtitle { text-align: center; color: #888; font-size: 0.8rem; margin-top: -12px; }
+        .shape-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .shape-card {
+            background: var(--bg); border: 2px solid var(--border);
+            border-radius: 8px; padding: 14px; cursor: pointer;
+            transition: all 0.2s; text-align: center;
+        }
+        .shape-card.selected { border-color: var(--accent); background: #1f1f38; }
+        .shape-card h3 { font-size: 0.9rem; margin-bottom: 2px; }
+        .shape-card p { font-size: 0.65rem; color: #888; }
+        .params { display: flex; flex-direction: column; gap: 8px; }
+        .param-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .param-row label { font-size: 0.7rem; min-width: 120px; color: #aaa; }
+        .param-row input[type=range] { flex:1; accent-color: var(--accent); }
+        .param-row span { font-size: 0.65rem; min-width: 28px; text-align: right; font-family: monospace; }
+        button {
+            padding: 14px; background: var(--accent); color: #fff;
+            border: none; border-radius: 8px; font-size: 1rem; font-weight: 600;
+            cursor: pointer; letter-spacing: 0.02em; width: 100%;
+        }
+        button:hover { background: #f08c6a; }
+        #status { text-align: center; font-size: 0.75rem; color: var(--accent2); min-height: 18px; }
+        .note { text-align: center; font-size: 0.6rem; color: #555; border-top: 1px solid var(--border); padding-top: 10px; }
+        @media (max-width: 480px) {
+            .shape-grid { grid-template-columns: 1fr; }
+            .container { padding: 16px; gap: 14px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>TPMS Forge</h1>
+    <p class="subtitle">Download metamaterial STLs for 3D printing — no accounts</p>
+
+    <div class="shape-grid" id="shapeGrid">
+        <div class="shape-card selected" data-shape="armored_neovius">
+            <h3>Armored Neovius</h3><p>Best all-rounder. Isotropic energy absorption.</p>
+        </div>
+        <div class="shape-card" data-shape="columnar_neodiamond">
+            <h3>Columnar Neodiamond</h3><p>Segmented helical column. Crack arrest + axial strength.</p>
+        </div>
+        <div class="shape-card" data-shape="fortified_diamond">
+            <h3>Fortified Diamond</h3><p>Maximum stiffness. Node-reinforced.</p>
+        </div>
+        <div class="shape-card" data-shape="tensile_z">
+            <h3>Tensile-Z</h3><p>Uniaxial specialist. No pinch-off.</p>
+        </div>
+    </div>
+
+    <div class="params" id="paramsPanel"></div>
+    <button id="downloadBtn">Download STL</button>
+    <p id="status"></p>
+    <p class="note">Opens Google Colab to generate your custom STL. No sign-up required.</p>
+</div>
+
+<script>
+var COLAB_URL = "https://colab.research.google.com/drive/1tX_bMC23XC8C0X0lqPZZ71WGR2Xn448D";
+
+var paramDefs = {
+    armored_neovius: [
+        {key:"kappa",label:"Wall stiffening",min:0.2,max:0.8,step:0.02,def:0.55},
+        {key:"lam",label:"Collapse triggers",min:0,max:0.4,step:0.02,def:0.20},
+        {key:"mu1",label:"Primary wrinkles",min:0,max:0.4,step:0.02,def:0.22},
+        {key:"mu2",label:"Fine wrinkles",min:0,max:0.2,step:0.02,def:0.10},
+        {key:"D_neo",label:"Bias",min:0,max:0.3,step:0.02,def:0.15}
+    ],
+    fortified_diamond: [
+        {key:"alpha",label:"Node fortification",min:0.1,max:0.5,step:0.02,def:0.25},
+        {key:"beta",label:"Shear disruptor",min:0.05,max:0.35,step:0.02,def:0.18},
+        {key:"D_dia",label:"Bias",min:0,max:0.3,step:0.02,def:0.12}
+    ],
+    tensile_z: [
+        {key:"alpha",label:"Lateral bracing",min:0.3,max:1,step:0.05,def:0.6},
+        {key:"beta",label:"Z-modulation",min:0.1,max:0.6,step:0.05,def:0.3},
+        {key:"kz",label:"Z-stretch",min:0.3,max:0.8,step:0.05,def:0.5}
+    ],
+    columnar_neodiamond: [
+        {key:"height",label:"Column height",min:4,max:16,step:0.5,def:8},
+        {key:"segments",label:"Segments",min:2,max:8,step:1,def:4},
+        {key:"turns",label:"Helix turns/seg",min:1,max:6,step:0.5,def:3}
+    ]
+};
+
+var state = { shape: "armored_neovius", params: {} };
+Object.keys(paramDefs).forEach(function(k) {
+    paramDefs[k].forEach(function(d) { state.params[d.key] = d.def; });
+});
+
+function renderParams() {
+    var panel = document.getElementById("paramsPanel");
+    var defs = paramDefs[state.shape] || [];
+    panel.innerHTML = defs.map(function(d) {
+        var v = state.params[d.key] || d.def;
+        return '<div class="param-row"><label>' + d.label + '</label>' +
+               '<input type="range" min="' + d.min + '" max="' + d.max +
+               '" step="' + d.step + '" value="' + v + '" data-key="' + d.key + '">' +
+               '<span>' + Number(v).toFixed(2) + '</span></div>';
+    }).join("");
+    panel.querySelectorAll("input").forEach(function(inp) {
+        inp.addEventListener("input", function() {
+            state.params[inp.dataset.key] = parseFloat(inp.value);
+            inp.nextElementSibling.textContent = parseFloat(inp.value).toFixed(2);
+        });
+    });
+}
+
+document.getElementById("shapeGrid").addEventListener("click", function(e) {
+    var card = e.target.closest(".shape-card");
+    if (!card) return;
+    document.querySelectorAll(".shape-card").forEach(function(c) { c.classList.remove("selected"); });
+    card.classList.add("selected");
+    state.shape = card.dataset.shape;
+    renderParams();
+});
+
+document.getElementById("downloadBtn").addEventListener("click", function() {
+    var s = document.getElementById("status");
+    s.textContent = "Opening Colab...";
+    window.location.href = COLAB_URL;
+    s.textContent = "Colab opened. Run the notebook to download your STL.";
+});
+
+renderParams();
+</script>
+</body>
+</html>
